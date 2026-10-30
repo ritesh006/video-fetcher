@@ -1,0 +1,24 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Downloaded media & temporary test files
+downloads/
+*.mkv
+*.mp4
+*.part
+*.ytdl
+
+# Environment & IDE configs
+.venv/
+venv/
+ENV/
+.env
+cookies.txt
+*.code-workspace
+.idea/
+.vscode/
