@@ -57,6 +57,12 @@ CANDIDATE_MIRRORS = [
     'https://hdhub4u.eco',
     'https://hdhub4u.ms',
 ]
+HOST_DISCOVERY_APIS = [
+    "https://h4.suncdn.org/host/",
+    "https://points.topapii.com/host/",
+    "https://ml.theapii.org/host/",
+    "https://dns.pingora.fyi/v2/host"
+]
 SEARCH_API_ENDPOINT = "https://search.pingora.fyi/collections/post/documents/search"
 _cached_active_domain = None
 
@@ -71,24 +77,48 @@ def check_deno() -> str:
     return shutil.which("deno") if shutil.which("deno") else None
 
 
+def fetch_live_mirror_from_discovery() -> str:
+    """Query official dynamic host discovery endpoints to find the current active mirror."""
+    for ep in HOST_DISCOVERY_APIS:
+        try:
+            req = Request(ep, headers={'User-Agent': USER_AGENT})
+            with urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if 'c' in data:
+                    raw_url = base64.b64decode(data['c']).decode('utf-8', errors='ignore')
+                    p = urlparse(raw_url)
+                    if p.scheme and p.netloc:
+                        return f"{p.scheme}://{p.netloc}"
+        except Exception:
+            continue
+    return None
+
+
 def get_active_domain(preferred_site=None) -> str:
-    """Detect and return an active, responsive domain mirror for HDHub4u."""
+    """Detect and return an active, responsive domain mirror for HDHub4u with dynamic fallback."""
     global _cached_active_domain
     if preferred_site:
         return preferred_site.rstrip('/')
     if _cached_active_domain:
         return _cached_active_domain
 
+    # 1. First test static known mirrors
     for domain in CANDIDATE_MIRRORS:
         try:
             req = Request(domain, headers={'User-Agent': USER_AGENT})
-            with urlopen(req, timeout=4) as resp:
+            with urlopen(req, timeout=3) as resp:
                 if resp.status == 200:
                     p = urlparse(resp.url)
                     _cached_active_domain = f"{p.scheme}://{p.netloc}"
                     return _cached_active_domain
         except Exception:
             continue
+
+    # 2. Fallback: discover current official mirror from live routing APIs
+    live_domain = fetch_live_mirror_from_discovery()
+    if live_domain:
+        _cached_active_domain = live_domain
+        return _cached_active_domain
 
     _cached_active_domain = CANDIDATE_MIRRORS[0]
     return _cached_active_domain
